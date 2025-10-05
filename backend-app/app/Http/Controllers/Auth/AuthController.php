@@ -21,9 +21,21 @@ class AuthController extends Controller
         return $this->respondWithToken($token);
     }
 
-    public function me()
+    public function getMe()
     {
-        return response()->json(JWTAuth::user());
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        return response()->json($user->only([
+            'id',
+            'email',
+            'role',
+            'created_at',
+            'updated_at'
+        ]));
     }
 
     public function logout()
