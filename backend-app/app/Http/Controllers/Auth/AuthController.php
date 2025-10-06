@@ -10,6 +10,52 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
+    public function register(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'name'                  => 'required|string|max:255',
+                'email'                 => 'required|email|unique:users,email',
+                'password'              => 'required|string|min:8|confirmed',
+                'password_confirmation' => 'required',
+                'role'                  => 'required|in:super_admin,merchant,customer'
+            ]);
+
+            $user = User::create([
+                'name'     => $validatedData['name'],
+                'email'    => $validatedData['email'],
+                'password' => Hash::make($validatedData['password']),
+                'role'     => $validatedData['role'],
+            ]);
+
+            $token = JWTAuth::fromUser($user);
+
+            return response()->json([
+                'message' => 'Registrasi berhasil',
+                'user' => [
+                    'id'    => $user->id,
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'role'  => $user->role,
+                ],
+                'token' => [
+                    'access_token' => $token,
+                    'token_type'   => 'bearer',
+                    'expires_in'   => JWTAuth::factory()->getTTL() * 60
+                ]
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat registrasi.',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
@@ -18,43 +64,84 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid Credentials'], 401);
         }
 
-        return $this->respondWithToken($token);
+        $user = JWTAuth::user();
+
+        return response()->json([
+            'message' => 'Login berhasil',
+            'user' => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+                'role'  => $user->role,
+            ],
+            'token' => [
+                'access_token' => $token,
+                'token_type'   => 'bearer',
+                'expires_in'   => JWTAuth::factory()->getTTL() * 60
+            ]
+        ]);
     }
 
     public function getMe()
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
+
+            return response()->json([
+                'message' => 'Data user berhasil diambil',
+                'user' => [
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'email'      => $user->email,
+                    'role'       => $user->role,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ]
+            ], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
-
-        return response()->json($user->only([
-            'id',
-            'email',
-            'role',
-            'created_at',
-            'updated_at'
-        ]));
     }
 
     public function logout()
     {
-        JWTAuth::invalidate(JWTAuth::getToken());
-        return response()->json(['message' => 'Successfully logged out']);
+        try {
+            JWTAuth::invalidate(JWTAuth::getToken());
+
+            return response()->json([
+                'message' => 'Logout berhasil!'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Gagal logout'], 500);
+        }
     }
 
     public function refresh()
     {
-        return $this->respondWithToken(JWTAuth::refresh(JWTAuth::getToken()));
+        try {
+            $newToken = JWTAuth::refresh(JWTAuth::getToken());
+
+            return response()->json([
+                'message' => 'Token berhasil diperbarui',
+                'token' => [
+                    'access_token' => $newToken,
+                    'token_type'   => 'bearer',
+                    'expires_in'   => JWTAuth::factory()->getTTL() * 60
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Token tidak dapat diperbarui'], 401);
+        }
     }
 
     protected function respondWithToken($token)
     {
         return response()->json([
-            'access_token' => $token,
-            'token_type'   => 'bearer',
-            'expires_in'   => JWTAuth::factory()->getTTL() * 60
-        ]);
+            'token' => [
+                'access_token' => $token,
+                'token_type'   => 'bearer',
+                'expires_in'   => JWTAuth::factory()->getTTL() * 60
+            ]
+        ], 200);
     }
 }

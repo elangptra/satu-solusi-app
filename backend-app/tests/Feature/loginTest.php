@@ -33,9 +33,22 @@ class LoginTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'access_token',
-                'token_type',
-                'expires_in',
+                'message',
+                'user' => [
+                    'id',
+                    'name',
+                    'email',
+                    'role',
+                ],
+                'token' => [
+                    'access_token',
+                    'token_type',
+                    'expires_in',
+                ]
+            ])
+            ->assertJson([
+                'message' => 'Login berhasil',
+                'user' => ['email' => 'testuser@example.com']
             ]);
     }
 
@@ -59,15 +72,19 @@ class LoginTest extends TestCase
         ])->getJson('/api/getMe');
 
         $response->assertStatus(200)
+            ->assertJsonStructure([
+                'message',
+                'user' => [
+                    'id',
+                    'name',
+                    'email',
+                    'role',
+                    'created_at',
+                    'updated_at',
+                ]
+            ])
             ->assertJsonFragment([
                 'email' => $this->user->email,
-            ])
-            ->assertJsonStructure([
-                'id',
-                'email',
-                'role',
-                'created_at',
-                'updated_at',
             ]);
     }
 
@@ -81,9 +98,15 @@ class LoginTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'access_token',
-                'token_type',
-                'expires_in',
+                'message',
+                'token' => [
+                    'access_token',
+                    'token_type',
+                    'expires_in',
+                ]
+            ])
+            ->assertJson([
+                'message' => 'Token berhasil diperbarui',
             ]);
     }
 
@@ -96,6 +119,8 @@ class LoginTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJson(['message' => 'Successfully logged out']);
+            ->assertJson([
+                'message' => 'Logout berhasil!'
+            ]);
     }
 }
