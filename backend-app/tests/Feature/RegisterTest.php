@@ -20,8 +20,6 @@ class RegisterTest extends TestCase
             'role'                  => 'customer',
         ]);
 
-        $response->dump();
-
         $response->assertStatus(201)
             ->assertJsonStructure([
                 'message',
