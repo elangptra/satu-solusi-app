@@ -71,7 +71,7 @@ class UserController extends Controller
             Log::info('Request Data:', $request->all());
             Log::info('Has File:', ['photo' => $request->hasFile('photo')]);
 
-            // ✅ Validasi yang diperbaiki
+            // Validasi yang diperbaiki
             $rules = [
                 'name'      => 'sometimes|string|max:255',
                 'email'     => 'sometimes|email|unique:users,email,' . $id,
@@ -89,7 +89,7 @@ class UserController extends Controller
 
             $validatedData = $request->validate($rules);
 
-            // 🖼️ Upload photo jika ada
+            // Upload photo jika ada
             $photoUrl = $user->profile->photo_url ?? null;
             if ($request->hasFile('photo')) {
                 // Hapus foto lama jika ada
@@ -103,7 +103,7 @@ class UserController extends Controller
                 $photoUrl = '/storage/' . $path;
             }
 
-            // 🔄 Update data user (hanya field yang ada di request)
+            // Update data user (hanya field yang ada di request)
             $userData = [];
             if ($request->has('name')) {
                 $userData['name'] = $validatedData['name'];
@@ -122,7 +122,7 @@ class UserController extends Controller
                 $user->update($userData);
             }
 
-            // 🔗 Update atau buat profile user
+            // Update atau buat profile user
             $profileData = [];
             if ($request->hasFile('photo')) {
                 $profileData['photo_url'] = $photoUrl;
