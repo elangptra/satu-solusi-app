@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -66,15 +67,27 @@ class UserController extends Controller
                 return response()->json(['error' => 'User tidak ditemukan'], 404);
             }
 
-            $validatedData = $request->validate([
+            // 🔍 Debug: Cek data yang masuk
+            Log::info('Request Data:', $request->all());
+            Log::info('Has File:', ['photo' => $request->hasFile('photo')]);
+
+            // ✅ Validasi yang diperbaiki
+            $rules = [
                 'name'      => 'sometimes|string|max:255',
                 'email'     => 'sometimes|email|unique:users,email,' . $id,
-                'password'  => 'nullable|string|min:8|confirmed',
                 'role'      => 'sometimes|in:super_admin,merchant,customer',
                 'photo'     => 'sometimes|file|image|mimes:jpeg,png,jpg|max:2048',
                 'address'   => 'sometimes|string|nullable',
                 'phone'     => 'sometimes|string|nullable'
-            ]);
+            ];
+
+            // Hanya validasi password jika diisi
+            if ($request->filled('password')) {
+                $rules['password'] = 'required|string|min:8';
+                $rules['password_confirmation'] = 'required|same:password';
+            }
+
+            $validatedData = $request->validate($rules);
 
             // 🖼️ Upload photo jika ada
             $photoUrl = $user->profile->photo_url ?? null;
@@ -90,31 +103,52 @@ class UserController extends Controller
                 $photoUrl = '/storage/' . $path;
             }
 
-            // 🔄 Update data user
-            $user->update([
-                'name'     => $validatedData['name'] ?? $user->name,
-                'email'    => $validatedData['email'] ?? $user->email,
-                'role'     => $validatedData['role'] ?? $user->role,
-                'password' => isset($validatedData['password'])
-                    ? Hash::make($validatedData['password'])
-                    : $user->password,
-            ]);
+            // 🔄 Update data user (hanya field yang ada di request)
+            $userData = [];
+            if ($request->has('name')) {
+                $userData['name'] = $validatedData['name'];
+            }
+            if ($request->has('email')) {
+                $userData['email'] = $validatedData['email'];
+            }
+            if ($request->has('role')) {
+                $userData['role'] = $validatedData['role'];
+            }
+            if ($request->filled('password')) {
+                $userData['password'] = Hash::make($validatedData['password']);
+            }
+
+            if (!empty($userData)) {
+                $user->update($userData);
+            }
 
             // 🔗 Update atau buat profile user
-            $user->profile()->updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'photo_url' => $photoUrl,
-                    'address'   => $validatedData['address'] ?? $user->profile->address ?? null,
-                    'phone'     => $validatedData['phone'] ?? $user->profile->phone ?? null,
-                ]
-            );
+            $profileData = [];
+            if ($request->hasFile('photo')) {
+                $profileData['photo_url'] = $photoUrl;
+            }
+            if ($request->has('address')) {
+                $profileData['address'] = $validatedData['address'];
+            }
+            if ($request->has('phone')) {
+                $profileData['phone'] = $validatedData['phone'];
+            }
+
+            if (!empty($profileData)) {
+                if ($user->profile) {
+                    $user->profile->update($profileData);
+                } else {
+                    $user->profile()->create(array_merge(
+                        ['user_id' => $user->id],
+                        $profileData
+                    ));
+                }
+            }
 
             return response()->json([
                 'message' => 'Data user berhasil diperbarui',
-                'user'    => $user->load('profile')
+                'user'    => $user->refresh()->load('profile'),
             ], 200);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'errors' => $e->errors()
