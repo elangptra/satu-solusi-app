@@ -56,6 +56,74 @@ class UserController extends Controller
     }
 
     /**
+     * Create new user with profile and optional photo
+     */
+    public function store(Request $request)
+    {
+        try {
+            // Validasi input
+            $rules = [
+                'name'      => 'required|string|max:255',
+                'email'     => 'required|email|unique:users,email',
+                'role'      => 'required|in:super_admin,merchant,customer',
+                'password'  => 'required|string|min:8|confirmed',
+                'photo'     => 'sometimes|file|image|mimes:jpeg,png,jpg|max:2048',
+                'address'   => 'sometimes|string|nullable',
+                'phone'     => 'sometimes|string|nullable',
+            ];
+
+            $validatedData = $request->validate($rules);
+
+            // Upload photo jika ada
+            $photoUrl = null;
+            if ($request->hasFile('photo')) {
+                $file = $request->file('photo');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('uploads/profile_photos', $filename, 'public');
+                $photoUrl = '/storage/' . $path;
+            }
+
+            // Simpan data user
+            $user = User::create([
+                'name'     => $validatedData['name'],
+                'email'    => $validatedData['email'],
+                'role'     => $validatedData['role'],
+                'password' => Hash::make($validatedData['password']),
+            ]);
+
+            // Simpan data profil
+            $profileData = [];
+            if ($photoUrl) {
+                $profileData['photo_url'] = $photoUrl;
+            }
+            if ($request->has('address')) {
+                $profileData['address'] = $validatedData['address'] ?? null;
+            }
+            if ($request->has('phone')) {
+                $profileData['phone'] = $validatedData['phone'] ?? null;
+            }
+
+            if (!empty($profileData)) {
+                $user->profile()->create($profileData);
+            }
+
+            return response()->json([
+                'message' => 'User baru berhasil dibuat',
+                'user'    => $user->load('profile'),
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Gagal membuat user baru',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update user by ID (with profile photo upload)
      */
     public function update(Request $request, $id)
@@ -67,11 +135,6 @@ class UserController extends Controller
                 return response()->json(['error' => 'User tidak ditemukan'], 404);
             }
 
-            // 🔍 Debug: Cek data yang masuk
-            Log::info('Request Data:', $request->all());
-            Log::info('Has File:', ['photo' => $request->hasFile('photo')]);
-
-            // Validasi yang diperbaiki
             $rules = [
                 'name'      => 'sometimes|string|max:255',
                 'email'     => 'sometimes|email|unique:users,email,' . $id,
@@ -173,7 +236,7 @@ class UserController extends Controller
                 return response()->json(['error' => 'User tidak ditemukan'], 404);
             }
 
-            // 🧹 Hapus foto jika ada
+            // Hapus foto jika ada
             if ($user->profile && $user->profile->photo_url) {
                 $photoPath = str_replace('/storage/', '', $user->profile->photo_url);
                 if (Storage::disk('public')->exists($photoPath)) {
