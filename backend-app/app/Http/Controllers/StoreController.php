@@ -137,6 +137,14 @@ class StoreController extends Controller
                 'description' => 'sometimes|string|nullable',
             ]);
 
+            $user = User::find($validated['user_id']);
+
+            if ($user->role !== 'merchant') {
+                return response()->json([
+                    'error' => 'Hanya user dengan role merchant yang dapat membuat store'
+                ], 403);
+            }
+
             $photoUrl = null;
             if ($request->hasFile('photo')) {
                 $file = $request->file('photo');
