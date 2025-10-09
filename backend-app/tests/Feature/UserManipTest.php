@@ -48,14 +48,24 @@ class UserManipTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'message',
-                'users' => [
+                'data' => [
                     '*' => [
                         'id',
                         'name',
                         'email',
                         'role',
-                        'profile'
+                        'address',
+                        'phone',
+                        'photo_url',
+                        'created_at',
+                        'updated_at',
                     ]
+                ],
+                'meta' => [
+                    'current_page',
+                    'per_page',
+                    'total',
+                    'total_page',
                 ]
             ]);
     }
@@ -196,7 +206,7 @@ class UserManipTest extends TestCase
     /** @test */
     public function test_it_can_delete_user_and_profile_with_photo()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin']);
         $photoPath = 'uploads/profile_photos/test_photo.jpg';
 
         Storage::disk('public')->put($photoPath, 'fake content');
