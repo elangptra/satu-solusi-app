@@ -14,22 +14,84 @@ class UserController extends Controller
     /**
      * Get all users with profile
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $users = User::with('profile')->get();
+            // Ambil query parameter
+            $search     = $request->query('search');
+            $sortBy     = $request->query('sort_by', 'id');
+            $sortOrder  = $request->query('sort_order', 'asc'); 
+            $perPage    = (int) $request->query('per_page', 10);
+
+            // Validasi kolom sorting
+            $allowedSorts = ['id', 'name', 'email', 'role', 'address', 'phone'];
+            if (!in_array($sortBy, $allowedSorts)) {
+                $sortBy = 'id';
+            }
+
+            // join ke user_profiles
+            $query = User::with('profile')
+                ->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')
+                ->select(
+                    'users.id',
+                    'users.name',
+                    'users.email',
+                    'users.role',
+                    'users.created_at',
+                    'users.updated_at',
+                    'user_profiles.address',
+                    'user_profiles.phone',
+                    'user_profiles.photo_url'
+                );
+
+            // Filter pencarian
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('users.name', 'LIKE', "%{$search}%")
+                        ->orWhere('users.email', 'LIKE', "%{$search}%")
+                        ->orWhere('users.role', 'LIKE', "%{$search}%")
+                        ->orWhere('user_profiles.address', 'LIKE', "%{$search}%")
+                        ->orWhere('user_profiles.phone', 'LIKE', "%{$search}%");
+                });
+            }
+
+            $query->orderBy($sortBy, $sortOrder);
+            $users = $query->paginate($perPage);
+            $formatted = $users->getCollection()->map(function ($user) {
+                return [
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'email'      => $user->email,
+                    'role'       => $user->role,
+                    'address'    => $user->address,
+                    'phone'      => $user->phone,
+                    'photo_url'  => $user->photo_url,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                ];
+            });
+
+            // Replace collection di pagination
+            $users->setCollection($formatted);
 
             return response()->json([
-                'message' => 'Data seluruh user berhasil diambil',
-                'users'   => $users
+                'message' => 'Data user berhasil diambil',
+                'data'    => $users->items(),
+                'meta'    => [
+                    'current_page' => $users->currentPage(),
+                    'per_page'     => $users->perPage(),
+                    'total'        => $users->total(),
+                    'total_page'    => $users->lastPage(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'error'   => 'Gagal mengambil data user',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     /**
      * Get user by ID
