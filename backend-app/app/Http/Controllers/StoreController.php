@@ -98,6 +98,32 @@ class StoreController extends Controller
     }
 
     /**
+     * Get store by User ID
+     */
+    public function getByUserId($userId)
+    {
+        try {
+            $store = Store::with('owner:id,name,email,role')
+                ->where('user_id', $userId)
+                ->first();
+
+            if (!$store) {
+                return response()->json(['error' => 'Store untuk user ini tidak ditemukan'], 404);
+            }
+
+            return response()->json([
+                'message' => 'Data store berdasarkan user_id berhasil diambil',
+                'store'   => $store,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Gagal mengambil data store berdasarkan user_id',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Create new store (1 user = 1 store)
      */
     public function store(Request $request)
