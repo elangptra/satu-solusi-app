@@ -16,6 +16,7 @@ class ProductFactory extends Factory
             'price' => $this->faker->randomFloat(2, 10, 500),
             'stock' => $this->faker->numberBetween(0, 100),
             'category' => $this->faker->word(),
+            'photo_url' => $this->faker->imageUrl(640, 480, 'product', true, 'Faker'),
             'is_active' => true,
             'created_at' => now(),
         ];
