@@ -7,3 +7,4 @@ require __DIR__.'/auth/auth.php';
 require __DIR__.'/user/user.php';
 require __DIR__.'/store.php';
 require __DIR__.'/product.php';
+require __DIR__.'/cart.php';
